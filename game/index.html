@@ -1,0 +1,212 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Maxi Coast Rush</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icon-192.png">
+<meta name="theme-color" content="#06131a">
+<style>
+  :root { --gold:#e9c877; --gold2:#f6e2ad; --dark:rgba(10,14,16,.72); }
+  * { margin:0; padding:0; box-sizing:border-box; user-select:none; -webkit-user-select:none; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#06131a;
+    font-family:"Segoe UI",system-ui,Arial,sans-serif; color:var(--gold2); }
+  #frame { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); }
+  canvas#c { display:block; width:100%; height:100%; }
+  .layer { position:absolute; inset:0; pointer-events:none; }
+
+  /* ---------- split HUD ---------- */
+  #hud { display:none; }
+  .half { position:absolute; left:0; right:0; height:50%; }
+  #halfTop { top:0; } #halfBot { bottom:0; display:none; }
+  #splitLine { position:absolute; top:50%; left:0; right:0; height:2px; display:none;
+    background:linear-gradient(90deg,transparent,rgba(233,200,119,.8),transparent); }
+  .plate { position:absolute; background:linear-gradient(160deg,rgba(16,22,26,.78),rgba(8,12,14,.6));
+    border:1px solid rgba(233,200,119,.35); backdrop-filter:blur(5px); border-radius:.8vw; }
+  .cap { font-size:.75vw; letter-spacing:.3em; color:var(--gold); opacity:.85; }
+  .pTag { position:absolute; top:1.4vh; left:1.6vw; padding:.5vh 1vw; border-radius:.6vw;
+    font-weight:900; font-size:1.1vw; letter-spacing:.15em; background:var(--dark);
+    border:1px solid rgba(233,200,119,.4); }
+  .pTag.p2c { color:#9fe2ff; border-color:rgba(120,200,255,.45); }
+  .scoreP { top:1.4vh; right:1.6vw; padding:.6vh 1.4vw .8vh 2vw; transform:skewX(-10deg); text-align:right; }
+  .scoreP>* { transform:skewX(10deg); }
+  .scoreVal { font-size:2.1vw; font-weight:800; line-height:1; color:#fff; font-variant-numeric:tabular-nums; }
+  .posB { position:absolute; top:1.4vh; left:8vw; padding:.5vh 1vw; border-radius:.6vw;
+    background:var(--dark); border:1px solid rgba(233,200,119,.35); font-weight:900; font-size:1.4vw; color:#fff; }
+  .oxy { position:absolute; bottom:2.2vh; left:1.6vw; width:4.6vw; display:none; }
+  .oxy svg { width:100%; }
+  .boostW { position:absolute; bottom:2.2vh; right:1.6vw; width:13vw; padding:.6vw .8vw;
+    background:var(--dark); border:1px solid rgba(233,200,119,.35); border-radius:.7vw; }
+  .boostBar { height:1vh; border-radius:.5vh; background:rgba(255,255,255,.09); overflow:hidden; }
+  .boostFill { height:100%; width:0%; border-radius:.5vh;
+    background:linear-gradient(90deg,#2fb0e0,#39d98a,#f6e2ad); transition:width .12s linear; }
+  .boostLbl { margin-top:.5vh; font-weight:800; font-size:.8vw; letter-spacing:.1em; color:var(--gold);
+    display:flex; justify-content:space-between; font-variant-numeric:tabular-nums; }
+  .boostLbl.ready { color:#7dff9e; text-shadow:0 0 .8vh rgba(120,255,150,.7); }
+  .feed { position:absolute; bottom:8.5vh; left:1.6vw; font-size:.95vw; font-weight:700; }
+  .feedRow { margin-top:.3vh; text-shadow:0 .2vh .8vh rgba(0,0,0,.8); animation:fout 2s forwards; }
+  .good { color:#9dffb0; } .bad { color:#ff7a6e; }
+  @keyframes fout { 0%{opacity:1} 75%{opacity:1} 100%{opacity:0; transform:translateX(-1vw)} }
+  .rflash { position:absolute; inset:0; opacity:0;
+    background:radial-gradient(ellipse at center, rgba(255,0,0,0) 40%, rgba(200,0,0,.75) 100%); }
+  .speedRO { position:absolute; bottom:2.2vh; right:16vw; padding:.5vh 1vw; border-radius:.6vw;
+    background:var(--dark); border:1px solid rgba(233,200,119,.3);
+    font-family:Consolas,monospace; font-size:1vw; color:var(--gold2); font-variant-numeric:tabular-nums; }
+
+  /* shared center */
+  #timePlate { position:absolute; top:1.2vh; left:50%; transform:translateX(-50%); padding:.5vh 1.4vw;
+    text-align:center; z-index:5; }
+  #timeVal { font-size:1.7vw; font-weight:800; font-variant-numeric:tabular-nums; }
+  #timeVal.low { color:#ff8a6e; animation:blink .6s infinite; }
+  #hudLogo { position:absolute; bottom:1.6vh; left:50%; transform:translateX(-50%);
+    width:6.5vw; opacity:.9; z-index:5; filter:drop-shadow(0 .4vh 1.2vh rgba(0,0,0,.6)); }
+  #stagePill { position:absolute; top:8vh; left:50%; transform:translateX(-50%); padding:.3vh 1.2vw;
+    border-radius:2vw; background:var(--dark); border:1px solid rgba(233,200,119,.3);
+    font-size:.8vw; letter-spacing:.3em; color:var(--gold); z-index:5; }
+  #bigCount { position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+    font-size:9vw; font-weight:900; color:var(--gold2); text-shadow:0 0 4vw rgba(233,200,119,.55); z-index:6; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  /* ---------- lobby ---------- */
+  #lobby { display:flex; flex-direction:column; align-items:center; justify-content:center;
+    background:radial-gradient(ellipse at 50% 30%, #123a4b 0%, #06131a 70%); }
+  .logo { font-size:4.6vw; font-weight:900; letter-spacing:.16em; color:var(--gold2);
+    text-shadow:0 .4vh 3vh rgba(0,0,0,.7), 0 0 3vw rgba(233,200,119,.25); }
+  .logo span { color:#c9973c; }
+  .tag { margin-top:.6vh; font-size:1vw; letter-spacing:.5em; color:var(--gold); opacity:.85; }
+  #slots { margin-top:5vh; display:flex; gap:3vw; }
+  .slot { width:24vw; padding:3.4vh 1.5vw; border-radius:1.2vw; text-align:center;
+    background:var(--dark); border:1px solid rgba(233,200,119,.3); transition:all .25s; }
+  .slot.in { border-color:#7dff9e; box-shadow:0 0 3vw rgba(120,255,150,.15); }
+  .slot .pn { font-size:1.6vw; font-weight:900; letter-spacing:.2em; }
+  .slot.s2 .pn { color:#9fe2ff; }
+  .flv { margin-top:1.8vh; font-size:1.35vw; font-weight:900; letter-spacing:.15em; display:none; }
+  .flv .arw { opacity:.55; margin:0 .9vw; animation:blink 1.2s infinite; font-size:1vw; }
+  .flv.locked .arw { visibility:hidden; }
+  .slot .st { margin-top:1.4vh; font-size:.95vw; letter-spacing:.2em; color:var(--gold); animation:blink 1.6s infinite; }
+  .slot.in .st { color:#7dff9e; animation:none; }
+  #startHint { margin-top:4.5vh; font-size:1.25vw; font-weight:800; letter-spacing:.2em;
+    color:var(--gold2); animation:blink 1.4s infinite; visibility:hidden; }
+  .hints { margin-top:3.5vh; font-size:.75vw; letter-spacing:.08em; color:var(--gold); opacity:.65;
+    text-align:center; line-height:2; }
+  .ver { position:absolute; bottom:2vh; font-size:.7vw; letter-spacing:.2em; color:var(--gold); opacity:.5; }
+
+  /* ---------- results ---------- */
+  #results { display:none; flex-direction:column; align-items:center; justify-content:center;
+    background:rgba(6,12,16,.9); backdrop-filter:blur(4px); }
+  #results h1 { font-size:2.6vw; font-weight:900; letter-spacing:.14em; color:var(--gold2); }
+  #winBanner { margin-top:1.4vh; font-size:4vw; font-weight:900; letter-spacing:.1em; color:#ffd700;
+    text-shadow:0 0 3vw rgba(255,215,0,.4); }
+  table { margin-top:3.5vh; border-collapse:collapse; font-size:1.3vw; }
+  th { font-size:.8vw; letter-spacing:.3em; color:var(--gold); padding:0 2.2vw 1.2vh; }
+  td { padding:.8vh 2.2vw; text-align:center; color:#fff; font-variant-numeric:tabular-nums; }
+  tr.win td { color:#ffe9ad; font-weight:800; }
+  .prompt { margin-top:3.6vh; font-size:1.2vw; letter-spacing:.12em; color:var(--gold2); animation:blink 1.4s infinite; }
+  .prompt2 { margin-top:1vh; font-size:.9vw; letter-spacing:.12em; color:var(--gold); opacity:.75; }
+  #splash { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2.4vh;
+    background:radial-gradient(ellipse at 50% 30%, #3a2414 0%, #1c1008 70%); z-index:50; pointer-events:auto;
+    transition:opacity .6s; }
+  #splash.done { opacity:0; pointer-events:none; }
+  #spLogo { width:18vw; filter:drop-shadow(0 1vh 3vh rgba(0,0,0,.6)); animation:pulseL 2.2s ease-in-out infinite; }
+  @keyframes pulseL { 0%,100%{transform:scale(1)} 50%{transform:scale(1.045)} }
+  #spSub { font-size:1.4vw; letter-spacing:.6em; color:var(--gold); font-weight:800; }
+  #spCans { display:flex; gap:2.2vw; align-items:flex-end; margin-top:1vh; }
+  #spCans img { height:15vh; filter:drop-shadow(0 .8vh 2vh rgba(0,0,0,.55)); animation:bobC 2.6s ease-in-out infinite; }
+  #spCans img:nth-child(2){animation-delay:.3s} #spCans img:nth-child(3){animation-delay:.6s} #spCans img:nth-child(4){animation-delay:.9s}
+  @keyframes bobC { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-1.2vh)} }
+  #spBarW { width:30vw; height:1.4vh; border-radius:1vh; background:rgba(255,255,255,.09);
+    border:1px solid rgba(233,200,119,.35); overflow:hidden; margin-top:2vh; }
+  #spBar { height:100%; width:0%; border-radius:1vh; transition:width .25s;
+    background:linear-gradient(90deg,#c9973c,#f6e21a,#f6e2ad); }
+  #spTxt { font-size:.85vw; letter-spacing:.35em; color:var(--gold); }
+  .brandLogoS { width:9vw; margin-bottom:1vh; filter:drop-shadow(0 .6vh 1.6vh rgba(0,0,0,.5)); }
+  .flvCan { height:17vh; margin:1.2vh auto 0; display:none; filter:drop-shadow(0 .8vh 2vh rgba(0,0,0,.55)); }
+  #dev { position:fixed; top:4px; left:4px; color:#0f0; font:12px monospace; display:none; z-index:99; }
+</style>
+</head>
+<body>
+<div id="frame">
+  <div class="layer" id="splash">
+    <img id="spLogo" src="./assets/brand/logo.png" alt="MAXI">
+    <div id="spSub">COAST RUSH</div>
+    <div id="spCans">
+      <img src="./assets/brand/can_orange.png"><img src="./assets/brand/can_lemon.png"><img src="./assets/brand/can_cola.png"><img src="./assets/brand/can_mint.png">
+    </div>
+    <div id="spBarW"><div id="spBar"></div></div>
+    <div id="spTxt">LOADING 0%</div>
+  </div>
+  <canvas id="c"></canvas>
+
+  <div class="layer" id="hud">
+    <div class="half" id="halfTop">
+      <div class="pTag" id="tag0"></div>
+      <div class="posB" id="pos0"></div>
+      <div class="plate scoreP"><div class="cap" id="scoreCap0"></div><div class="scoreVal" id="score0">0</div></div>
+      <div class="oxy" id="oxy0"><svg viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="42" fill="rgba(6,20,30,.7)" stroke="rgba(120,200,255,.35)" stroke-width="5"/>
+        <circle class="oxyArc" cx="50" cy="50" r="42" fill="none" stroke="#5fd2ff" stroke-width="7"
+          stroke-linecap="round" stroke-dasharray="264" stroke-dashoffset="0" transform="rotate(-90 50 50)"/>
+        <text class="oxyPct" x="50" y="58" text-anchor="middle" font-size="24" font-weight="800" fill="#dff4ff">100</text>
+      </svg></div>
+      <div class="speedRO" id="spd0">[ 20 KM/H ]</div>
+      <div class="boostW"><div class="boostBar"><div class="boostFill" id="bf0"></div></div>
+        <div class="boostLbl" id="bl0"><span></span><span></span></div></div>
+      <div class="feed" id="feed0"></div>
+      <div class="rflash" id="rf0"></div>
+    </div>
+    <div class="half" id="halfBot">
+      <div class="pTag p2c" id="tag1"></div>
+      <div class="posB" id="pos1"></div>
+      <div class="plate scoreP"><div class="cap" id="scoreCap1"></div><div class="scoreVal" id="score1">0</div></div>
+      <div class="oxy" id="oxy1"><svg viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="42" fill="rgba(6,20,30,.7)" stroke="rgba(120,200,255,.35)" stroke-width="5"/>
+        <circle class="oxyArc" cx="50" cy="50" r="42" fill="none" stroke="#5fd2ff" stroke-width="7"
+          stroke-linecap="round" stroke-dasharray="264" stroke-dashoffset="0" transform="rotate(-90 50 50)"/>
+        <text class="oxyPct" x="50" y="58" text-anchor="middle" font-size="24" font-weight="800" fill="#dff4ff">100</text>
+      </svg></div>
+      <div class="speedRO" id="spd1">[ 20 KM/H ]</div>
+      <div class="boostW"><div class="boostBar"><div class="boostFill" id="bf1"></div></div>
+        <div class="boostLbl" id="bl1"><span></span><span></span></div></div>
+      <div class="feed" id="feed1"></div>
+      <div class="rflash" id="rf1"></div>
+    </div>
+    <div id="splitLine"></div>
+    <div class="plate" id="timePlate"><div class="cap" id="timeCap"></div><div id="timeVal">03:00</div></div>
+    <img id="hudLogo" src="./assets/brand/logo.png" alt="MAXI">
+    <div id="stagePill"></div>
+  </div>
+  <div class="layer" id="bigCount"></div>
+
+  <div class="layer" id="lobby">
+    <img class="brandLogoS" style="width:14vw" src="./assets/brand/logo.png" alt="MAXI">
+    <div class="logo" style="font-size:2.6vw">COAST <span>RUSH</span></div>
+    <div class="tag" id="tagline"></div>
+    <div id="slots">
+      <div class="slot s1" id="slot0"><div class="pn" id="slotName0"></div><img class="flvCan" id="canimg0" src="./assets/brand/can_orange.png">
+        <div class="flv" id="flv0"><span class="arw">&#9664;</span><span id="fname0"></span><span class="arw">&#9654;</span></div>
+        <div class="st" id="slotSt0"></div></div>
+      <div class="slot s2" id="slot1"><div class="pn" id="slotName1"></div><img class="flvCan" id="canimg1" src="./assets/brand/can_orange.png">
+        <div class="flv" id="flv1"><span class="arw">&#9664;</span><span id="fname1"></span><span class="arw">&#9654;</span></div>
+        <div class="st" id="slotSt1"></div></div>
+    </div>
+    <div id="startHint"></div>
+    <div class="hints" id="hints"></div>
+    <div class="ver" id="ver"></div>
+  </div>
+
+  <div class="layer" id="results">
+    <img class="brandLogoS" src="./assets/brand/logo.png" alt="MAXI">
+    <h1 id="finishTitle"></h1>
+    <div id="winBanner"></div>
+    <table><thead><tr id="thead"></tr></thead><tbody id="tbody"></tbody></table>
+    <div class="prompt" id="againPrompt"></div>
+    <div class="prompt2" id="lobbyPrompt"></div>
+  </div>
+</div>
+<div id="dev"></div>
+<script src="./assets/vendor/three-bundle.js"></script>
+<script>
+<script type="module" src="./assets/game.js"></script>
+</body>
+</html>

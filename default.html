@@ -1,0 +1,59 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Maxi Coast Rush</title>
+<style>
+  html,body{margin:0;padding:0;width:100%;height:100%;background:#06131a;overflow:hidden}
+  #wv{position:absolute;inset:0;width:100%;height:100%;border:0}
+</style>
+</head>
+<body>
+<x-ms-webview id="wv" src="ms-appx-web:///game/index.html"></x-ms-webview>
+<script>
+// Xbox TV-safe area: shrink content a bit so nothing is cut off on older TVs.
+try { Windows.UI.ViewManagement.ApplicationView.getForCurrentView()
+      .setDesiredBoundsMode(Windows.UI.ViewManagement.ApplicationViewBoundsMode.useCoreWindow); } catch(e){}
+
+// --- Gamepad -> keyboard shim, forwarded into the webview ---
+const wv = document.getElementById('wv');
+const MAP = {
+  0:  'Space',       // A
+  1:  'Escape',      // B
+  2:  'KeyX',        // X
+  3:  'KeyY',        // Y
+  4:  'KeyQ',        // LB
+  5:  'KeyE',        // RB
+  9:  'Enter',       // Start
+  8:  'Tab',         // Back
+  12: 'ArrowUp', 13: 'ArrowDown', 14: 'ArrowLeft', 15: 'ArrowRight'
+};
+const held = new Set();
+function press(code, down){
+  const key = held.has(code);
+  if(down && key) return;
+  if(!down && !key) return;
+  if(down) held.add(code); else held.delete(code);
+  const script = `(function(){var e=new KeyboardEvent('${down?'keydown':'keyup'}',{code:'${code}',key:'${code}',bubbles:true});document.dispatchEvent(e);window.dispatchEvent(e);})();`;
+  try { wv.invokeScriptAsync('eval', script); } catch(e){}
+}
+function poll(){
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  for(const p of pads){
+    if(!p) continue;
+    // buttons
+    p.buttons.forEach((b,i)=>{ if(MAP[i]) press(MAP[i], b.pressed); });
+    // left stick -> arrows
+    const [lx,ly] = [p.axes[0]||0, p.axes[1]||0];
+    press('ArrowLeft',  lx < -0.4);
+    press('ArrowRight', lx >  0.4);
+    press('ArrowUp',    ly < -0.4);
+    press('ArrowDown',  ly >  0.4);
+  }
+  requestAnimationFrame(poll);
+}
+window.addEventListener('gamepadconnected', ()=>{});
+requestAnimationFrame(poll);
+</script>
+</body>
+</html>
