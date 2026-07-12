@@ -1,0 +1,44 @@
+name: Build Xbox MSIX
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Add SDK signing tools to PATH
+        shell: pwsh
+        run: |
+          $sdk = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Directory |
+                 Where-Object { $_.Name -match '^10\.' } |
+                 Sort-Object Name -Descending | Select-Object -First 1
+          Write-Host "Using SDK: $($sdk.FullName)"
+          "$($sdk.FullName)\x64" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Build & sign MSIX
+        shell: pwsh
+        working-directory: .
+        run: |
+          if (Test-Path .\Build-Xbox.ps1) {
+            .\Build-Xbox.ps1
+          } elseif (Test-Path .\MaxiCoastRush-UWP\Build-Xbox.ps1) {
+            Set-Location .\MaxiCoastRush-UWP
+            .\Build-Xbox.ps1
+          } else {
+            throw "Build-Xbox.ps1 not found at repo root or in MaxiCoastRush-UWP\"
+          }
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: MaxiCoastRush-Xbox
+          path: |
+            **/dist/MaxiCoastRush.msix
+            **/dist/MaxiCoastRush.cer
+          if-no-files-found: error
