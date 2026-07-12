@@ -45,13 +45,6 @@
           <uap:Rotation Preference="landscapeFlipped"/>
         </uap:InitialRotationPreference>
       </uap:VisualElements>
-      <Extensions>
-        <uap3:Extension Category="windows.applicationContentUriRules">
-          <uap3:ApplicationContentUriRules>
-            <uap3:Rule Type="include" WindowsRuntimeAccess="all" Match="ms-appx-web:///game/*" />
-          </uap3:ApplicationContentUriRules>
-        </uap3:Extension>
-      </Extensions>
     </Application>
   </Applications>
 
